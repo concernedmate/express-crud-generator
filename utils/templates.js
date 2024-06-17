@@ -106,6 +106,14 @@ const generate = (table, fields) => {
         fs.appendFileSync(file_path, create(table, fields));
         exports.push(`create${table[0].toUpperCase()}${table.slice(1)}`);
 
+        // update
+        fs.appendFileSync(file_path, updateByKey(table, fields));
+        exports.push(`update${table[0].toUpperCase()}${table.slice(1)}`);
+
+        // delete
+        fs.appendFileSync(file_path, deleteByKey(table, fields));
+        exports.push(`delete${table[0].toUpperCase()}${table.slice(1)}`);
+
         // module exports
         fs.appendFileSync(file_path, `\nmodule.exports = {${exports.toString()}}`);
         console.log(`Generated ${file_path}`);
@@ -242,11 +250,118 @@ const read = (table) => {
 }
 
 const updateByKey = (table, fields) => {
+    let field_checker = ``
+    let field_vars = ``
+    let fields_arr = []
+    let key = ''
+    let key_checker = ''
 
+    for (let i = 0; i < fields.length; i++) {
+        const autoincrement = (fields[i].flags & mysql2_flags.AUTO_INCREMENT) == mysql2_flags.AUTO_INCREMENT; // check autoincrement
+        const primary_key = (fields[i].flags & mysql2_flags.PRI_KEY) == mysql2_flags.PRI_KEY; // check autoincrement
+        const not_null = (fields[i].flags & mysql2_flags.NOT_NULL) == mysql2_flags.NOT_NULL;
+        const no_default = (fields[i].flags & mysql2_flags.NO_DEFAULT_VALUE) == mysql2_flags.NO_DEFAULT_VALUE;
+        const is_datetime = (fields[i].type == mysql2_types.DATETIME || fields.type == mysql2_types.TIMESTAMP);
+        const is_number = (
+            fields[i].type == mysql2_types.TINY ||
+            fields[i].type == mysql2_types.SHORT ||
+            fields[i].type == mysql2_types.LONG ||
+            fields[i].type == mysql2_types.INT24
+        );
+        const is_key = autoincrement || primary_key;
+
+        if (is_datetime && !no_default) continue;
+
+        if (is_key) {
+            key = fields[i].name;
+            key_checker = `${fields[i].name}: joi${is_number ? '.number()' : '.string()'}.required(),`
+        } else {
+            field_checker += `${fields[i].name}: joi${is_number ? '.number()' : '.string()'}.optional(),\n`
+            field_vars += `${fields[i].name},`;
+            fields_arr.push(fields[i].name);
+        }
+    }
+    field_checker = field_checker.trim();
+    field_vars = field_vars.trim();
+    field_vars = field_vars.slice(0, field_vars.length - 1);
+
+    const input_checker = `const schema = joi.object({
+            ${key_checker}
+            ${field_checker}
+        });
+        const { error } = schema.validate(req.body);
+        if (error) return response(res, 500, error.message);
+
+        const {${key}, fields} = req.body;
+        const {${field_vars}} = fields;
+    `
+
+    let optional_checker = `let fields = \`\`\n`
+    for (let i = 0; i < fields_arr.length; i++) {
+        optional_checker += `if (${fields_arr[i]} != null) fields += \`SET ${fields_arr[i]} = '\${${fields_arr[i]}}', \`\n`
+    }
+    optional_checker += `
+    fields.trimEnd();
+    fields = fields.slice(0, fields.length-1);
+    `
+
+    return `
+    const update${table[0].toUpperCase()}${table.slice(1)} = async (req, res) => {
+        try {
+            ${input_checker}
+            ${optional_checker}
+            const query = \`UPDATE ${table} \${fields} WHERE ${key}='\${${key}}' \`;
+            const [resp] = await dbPool.query(query);
+            return response(res, 200, '[Success]', resp);
+        } catch (error) {
+            return response(res, 500, error.message);
+        }
+    }
+    `
 }
 
-const deleteByKey = (table) => {
+const deleteByKey = (table, fields) => {
+    let key = ''
+    let key_checker = ''
 
+    for (let i = 0; i < fields.length; i++) {
+        const autoincrement = (fields[i].flags & mysql2_flags.AUTO_INCREMENT) == mysql2_flags.AUTO_INCREMENT; // check autoincrement
+        const primary_key = (fields[i].flags & mysql2_flags.PRI_KEY) == mysql2_flags.PRI_KEY;
+        const is_key = autoincrement || primary_key;
+        const is_number = (
+            fields[i].type == mysql2_types.TINY ||
+            fields[i].type == mysql2_types.SHORT ||
+            fields[i].type == mysql2_types.LONG ||
+            fields[i].type == mysql2_types.INT24
+        );
+
+        if (is_key) {
+            key = fields[i].name;
+            key_checker = `${fields[i].name}: joi${is_number ? '.number()' : '.string()'}.required()`
+            break;
+        }
+    }
+
+    const input_checker = `const schema = joi.object({
+            ${key_checker}
+        });
+        const { error } = schema.validate(req.body);
+        if (error) return response(res, 500, error.message);
+
+        const {${key}} = req.body;
+    `
+
+    return `
+    const delete${table[0].toUpperCase()}${table.slice(1)} = async (req, res) => {
+        try {
+            ${input_checker}
+            const query = \`DELETE ${table} WHERE ${key}='\${${key}}' \`;
+            const [resp] = await dbPool.query(query);
+            return response(res, 200, '[Success]', resp);
+        } catch (error) {
+            return response(res, 500, error.message);
+        }
+    }`
 }
 
 const routes = (table, exported = ['']) => {
@@ -265,7 +380,7 @@ const routes = (table, exported = ['']) => {
             method = 'delete';
             params = '/delete'
         }
-        routes += `router.${method}('${params}', ${table}Controller.${exported});\n`;
+        routes += `router.${method}('${params}', ${table}Controller.${exported[i]});\n`;
     }
     return `${requires}\n${routes}\nmodule.exports = router;`
 }

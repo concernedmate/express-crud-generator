@@ -1,7 +1,5 @@
-
-const fs = require('fs');
-const readline = require('readline');
 const { dbPool } = require('./config/initmysql');
+const templates = require('./utils/templates');
 
 const readTableMysql = async (table = '') => {
     const [resp, fields] = await dbPool.query(`SELECT * FROM ${table} LIMIT 1`);
@@ -9,8 +7,8 @@ const readTableMysql = async (table = '') => {
 }
 
 const readArgs = () => {
-    const validArgs = ['table', '-mysql', '-mssql'];
-    const args = { table: '', options: [] };
+    const validArgs = ['table', '-mysql', '-mssql', '-withMiddleware'];
+    const args = { table: '', mysql: false, mssql: false, withmiddleware: false };
     const read = process.argv;
     for (let i = 2; i < read.length; i++) {
         if (validArgs.indexOf(read[i]) == -1) {
@@ -20,7 +18,7 @@ const readArgs = () => {
             }
         } else {
             if (read[i][0] == '-') {
-                args['options'].push(read[i]);
+                args[read[i].slice(1).toLowerCase()] = true;
             } else {
                 if (read[i + 1] == undefined) {
                     console.log(`Invalid argument ${read[i]} need input`);
@@ -38,7 +36,8 @@ const readArgs = () => {
 const generateCrud = async () => {
     const args = readArgs();
     const fields = await readTableMysql(args.table);
-    console.log("hello world");
+    
+    templates.generate(args.table, fields, args.withmiddleware)
     process.exit();
 }
 

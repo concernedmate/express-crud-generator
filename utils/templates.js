@@ -69,79 +69,6 @@ module.exports = { dbPool }
 
 /**
  * 
- * @param {String} table 
- * @param {import('mysql2').FieldPacket[]} fields 
- * @returns {String}
- */
-const generate = (table, fields) => {
-    try {
-        if (table == null || fields == null) return false;
-
-        // GENERATE DB CONN
-        const db_conn_path = path.join(__dirname, '../generated/config/');
-        if (!fs.existsSync(db_conn_path)) { fs.mkdirSync(db_conn_path); }
-        const db_conn_file_path = path.join(db_conn_path, `initmysql.js`);
-        if (fs.existsSync(db_conn_file_path)) {
-            fs.unlinkSync(db_conn_file_path);
-        }
-        fs.writeFileSync(db_conn_file_path, dbConn);
-        console.log(`Generated ${db_conn_file_path}`);
-
-        // GENERATE CONTROLLERS
-        const controller_path = path.join(__dirname, '../generated/controllers/');
-        if (!fs.existsSync(controller_path)) { fs.mkdirSync(controller_path); }
-        const file_path = path.join(controller_path, `${table}.js`);
-        if (fs.existsSync(file_path)) {
-            fs.unlinkSync(file_path);
-        } else {
-            fs.writeFileSync(file_path, '')
-        }
-
-        let exports = []
-
-        // imports
-        fs.appendFileSync(file_path, requiredImports());
-
-        // read
-        fs.appendFileSync(file_path, read(table));
-        exports.push(`get${formatCamelCase(table)}`);
-
-        // create
-        fs.appendFileSync(file_path, create(table, fields));
-        exports.push(`create${formatCamelCase(table)}`);
-
-        // update
-        fs.appendFileSync(file_path, updateByKey(table, fields));
-        exports.push(`update${formatCamelCase(table)}`);
-
-        // delete
-        fs.appendFileSync(file_path, deleteByKey(table, fields));
-        exports.push(`delete${formatCamelCase(table)}`);
-
-        // module exports
-        fs.appendFileSync(file_path, `\nmodule.exports = {${exports.toString()}}`);
-        console.log(`Generated ${file_path}`);
-
-        // GENERATE ROUTERS
-        const router_path = path.join(__dirname, '../generated/routes/');
-        if (!fs.existsSync(router_path)) { fs.mkdirSync(router_path); }
-
-        const router_file_path = path.join(router_path, `${table}.js`);
-        if (fs.existsSync(router_file_path)) {
-            fs.unlinkSync(router_file_path);
-        } else {
-            fs.writeFileSync(router_file_path, '')
-        }
-        fs.appendFileSync(router_file_path, routes(table, exports));
-        console.log(`Generated ${router_file_path}`)
-    } catch (error) {
-        console.log(error);
-        return false;
-    }
-}
-
-/**
- * 
  * @returns {String}
  */
 const requiredImports = () => {
@@ -435,6 +362,82 @@ const routes = (table, exported) => {
         routes += `router.${method}('${params}', ${table}Controller.${exported[i]});\n`;
     }
     return `${requires}\n${routes}\nmodule.exports = router;`
+}
+
+
+
+/**
+ * 
+ * @param {String} table 
+ * @param {import('mysql2').FieldPacket[]} fields 
+ * @returns {boolean}
+ */
+const generate = (table, fields) => {
+    try {
+        if (table == null || fields == null) return false;
+
+        // GENERATE DB CONN
+        const db_conn_path = path.join(__dirname, '../generated/config/');
+        if (!fs.existsSync(db_conn_path)) { fs.mkdirSync(db_conn_path); }
+        const db_conn_file_path = path.join(db_conn_path, `initmysql.js`);
+        if (fs.existsSync(db_conn_file_path)) {
+            fs.unlinkSync(db_conn_file_path);
+        }
+        fs.writeFileSync(db_conn_file_path, dbConn);
+        console.log(`Generated ${db_conn_file_path}`);
+
+        // GENERATE CONTROLLERS
+        const controller_path = path.join(__dirname, '../generated/controllers/');
+        if (!fs.existsSync(controller_path)) { fs.mkdirSync(controller_path); }
+        const file_path = path.join(controller_path, `${table}.js`);
+        if (fs.existsSync(file_path)) {
+            fs.unlinkSync(file_path);
+        } else {
+            fs.writeFileSync(file_path, '')
+        }
+
+        let exports = []
+
+        // imports
+        fs.appendFileSync(file_path, requiredImports());
+
+        // read
+        fs.appendFileSync(file_path, read(table));
+        exports.push(`get${formatCamelCase(table)}`);
+
+        // create
+        fs.appendFileSync(file_path, create(table, fields));
+        exports.push(`create${formatCamelCase(table)}`);
+
+        // update
+        fs.appendFileSync(file_path, updateByKey(table, fields));
+        exports.push(`update${formatCamelCase(table)}`);
+
+        // delete
+        fs.appendFileSync(file_path, deleteByKey(table, fields));
+        exports.push(`delete${formatCamelCase(table)}`);
+
+        // module exports
+        fs.appendFileSync(file_path, `\nmodule.exports = {${exports.toString()}}`);
+        console.log(`Generated ${file_path}`);
+
+        // GENERATE ROUTERS
+        const router_path = path.join(__dirname, '../generated/routes/');
+        if (!fs.existsSync(router_path)) { fs.mkdirSync(router_path); }
+
+        const router_file_path = path.join(router_path, `${table}.js`);
+        if (fs.existsSync(router_file_path)) {
+            fs.unlinkSync(router_file_path);
+        } else {
+            fs.writeFileSync(router_file_path, '')
+        }
+        fs.appendFileSync(router_file_path, routes(table, exports));
+        console.log(`Generated ${router_file_path}`);
+        return true;
+    } catch (error) {
+        console.log(error);
+        return false;
+    }
 }
 
 module.exports = { generate }

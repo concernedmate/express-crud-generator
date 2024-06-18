@@ -9,6 +9,9 @@ var config = {
     port: process.env.MYSQL_PORT
 };
 
+/**
+ * @type {mysql.Pool}
+ */
 const dbPool = mysql.createPool(config);
 
 module.exports = { dbPool }

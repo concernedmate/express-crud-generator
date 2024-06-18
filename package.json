@@ -11,5 +11,8 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "mysql2": "^3.10.1"
+  },
+  "devDependencies": {
+    "jsdoc": "^4.0.3"
   }
 }

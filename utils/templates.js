@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// taken from field_flags.js in mysql2
+// from mysql2 source
 const mysql2_flags = {
     NOT_NULL: 1,
     PRI_KEY: 2,
@@ -19,8 +19,6 @@ const mysql2_flags = {
     ON_UPDATE_NOW: 8192,
     NUM: 32768
 }
-
-// from mysql2 source
 const mysql2_types = {
     DECIMAL: 0,
     TINY: 1,
@@ -69,6 +67,12 @@ const dbPool = mysql.createPool(config);
 module.exports = { dbPool }
 `
 
+/**
+ * 
+ * @param {String} table 
+ * @param {import('mysql2').FieldPacket[]} fields 
+ * @returns {String}
+ */
 const generate = (table, fields) => {
     try {
         if (table == null || fields == null) return false;
@@ -100,19 +104,19 @@ const generate = (table, fields) => {
 
         // read
         fs.appendFileSync(file_path, read(table));
-        exports.push(`get${table[0].toUpperCase()}${table.slice(1)}`);
+        exports.push(`get${formatCamelCase(table)}`);
 
         // create
         fs.appendFileSync(file_path, create(table, fields));
-        exports.push(`create${table[0].toUpperCase()}${table.slice(1)}`);
+        exports.push(`create${formatCamelCase(table)}`);
 
         // update
         fs.appendFileSync(file_path, updateByKey(table, fields));
-        exports.push(`update${table[0].toUpperCase()}${table.slice(1)}`);
+        exports.push(`update${formatCamelCase(table)}`);
 
         // delete
         fs.appendFileSync(file_path, deleteByKey(table, fields));
-        exports.push(`delete${table[0].toUpperCase()}${table.slice(1)}`);
+        exports.push(`delete${formatCamelCase(table)}`);
 
         // module exports
         fs.appendFileSync(file_path, `\nmodule.exports = {${exports.toString()}}`);
@@ -136,6 +140,10 @@ const generate = (table, fields) => {
     }
 }
 
+/**
+ * 
+ * @returns {String}
+ */
 const requiredImports = () => {
     return `
     require("dotenv").config();
@@ -146,6 +154,12 @@ const requiredImports = () => {
     `
 }
 
+/**
+ * 
+ * @param {String} table 
+ * @param {import('mysql2').FieldPacket[]} fields 
+ * @returns {String}
+ */
 const create = (table, fields) => {
     let field_checker = ``
     let field_vars = ``
@@ -208,7 +222,7 @@ const create = (table, fields) => {
     `
 
     return `
-    const create${table[0].toUpperCase()}${table.slice(1)} = async (req, res) => {
+    const create${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker} ${optional_checker}
             const query = \`INSERT INTO ${table} (\${col}) VALUES (\${val})\`;
@@ -221,6 +235,11 @@ const create = (table, fields) => {
     `
 }
 
+/**
+ * 
+ * @param {String} table 
+ * @returns {String}
+ */
 const read = (table) => {
     const input_checker = `const schema = joi.object({
                 from_row: joi.number().optional(),
@@ -236,7 +255,7 @@ const read = (table) => {
     `
 
     return `
-    const get${table[0].toUpperCase()}${table.slice(1)} = async (req, res) => {
+    const get${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
             const query = 'SELECT * FROM ${table} LIMIT' + from_row + ', ' + limit;
@@ -249,6 +268,12 @@ const read = (table) => {
     `
 }
 
+/**
+ * 
+ * @param {String} table 
+ * @param {import('mysql2').FieldPacket[]} fields 
+ * @returns {String}
+ */
 const updateByKey = (table, fields) => {
     let field_checker = ``
     let field_vars = ``
@@ -306,7 +331,7 @@ const updateByKey = (table, fields) => {
     `
 
     return `
-    const update${table[0].toUpperCase()}${table.slice(1)} = async (req, res) => {
+    const update${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
             ${optional_checker}
@@ -320,6 +345,12 @@ const updateByKey = (table, fields) => {
     `
 }
 
+/**
+ * 
+ * @param {String} table 
+ * @param {import('mysql2').FieldPacket[]} fields 
+ * @returns {String}
+ */
 const deleteByKey = (table, fields) => {
     let key = ''
     let key_checker = ''
@@ -352,7 +383,7 @@ const deleteByKey = (table, fields) => {
     `
 
     return `
-    const delete${table[0].toUpperCase()}${table.slice(1)} = async (req, res) => {
+    const delete${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
             const query = \`DELETE ${table} WHERE ${key}='\${${key}}' \`;
@@ -364,7 +395,28 @@ const deleteByKey = (table, fields) => {
     }`
 }
 
-const routes = (table, exported = ['']) => {
+/**
+ * 
+ * @param {String} str something like abc_def or ABc_dEF
+ */
+const formatCamelCase = (str) => {
+    str = str.toLowerCase()
+    let idx = 0;
+    while (true) {
+        idx = str.indexOf('_');
+        if (idx == -1) break;
+        str = `${str.slice(0, idx)}${str.charAt(idx + 1).toUpperCase()}${str.slice(idx + 2)}`
+    }
+    return `${str.charAt(0).toUpperCase()}${str.slice(1)}`;
+}
+
+/**
+ * 
+ * @param {String} table 
+ * @param {String[]} exported 
+ * @returns {String}
+ */
+const routes = (table, exported) => {
     let requires = `const ${table}Controller = require('../controllers/${table}.js');\n`
     let routes = ``;
     for (let i = 0; i < exported.length; i++) {

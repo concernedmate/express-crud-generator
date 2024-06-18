@@ -1,20 +1,5 @@
-const { dbPool } = require('./config/initmysql');
+const { readAllTablesMysql, readTableMysql } = require('./utils/read_tables');
 const templates = require('./utils/templates');
-
-const readTableMysql = async (table = '') => {
-    const [resp, fields] = await dbPool.query(`SELECT * FROM ${table} LIMIT 1`);
-    return fields;
-}
-
-const readAllTablesMysql = async () => {
-    const [resp] = await dbPool.query(`SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema = '${process.env.MYSQL_DB}'`);
-    if (resp.length == 0) { console.log("DB has no tables!"); process.exit(); }
-    const tables = [];
-    for (let i = 0; i < resp.length; i++) {
-        tables.push(resp[i].TABLE_NAME)
-    }
-    return tables;
-}
 
 const readArgs = () => {
     const validArgs = ['table', '-mysql', '-mssql', '-withMiddleware'];

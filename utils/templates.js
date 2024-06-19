@@ -118,8 +118,8 @@ const create = (table, fields) => {
     }
     field_checker = field_checker.trim();
     field_vars = field_vars.trim();
-    field_checker = field_checker.substr(0, field_checker.length - 1);
-    field_vars = field_vars.substr(0, field_vars.length - 1);
+    field_checker = field_checker.slice(0, field_checker.length - 1);
+    field_vars = field_vars.slice(0, field_vars.length - 1);
 
     const input_checker = `const schema = joi.object({
         ${field_checker}
@@ -134,8 +134,8 @@ const create = (table, fields) => {
     required_val_string.forEach((elm, idx) => { required_val_string[idx] = `'\${${elm}}'`; });
 
     let optional_checker = `
-        let col = \`${required_val.toString()},\`
-        let val = \`${required_val_string.toString()},\`
+        let col = \`${required_val.toString()}${required_val.length == 0 ? '' : ','}\`
+        let val = \`${required_val_string.toString()}${required_val_string.length == 0 ? '' : ','}\`
     `;
     for (let i = 0; i < not_required_val.length; i++) {
         optional_checker += `if (${not_required_val[i]} != null) {
@@ -144,8 +144,8 @@ const create = (table, fields) => {
         }`
     }
     optional_checker += `
-        col = col.substr(0, col.length-1);
-        val = val.substr(0, val.length-1);
+        col = col.slice(0, col.length-1);
+        val = val.slice(0, val.length-1);
     `
 
     return `
@@ -223,7 +223,6 @@ const updateByKey = (table, fields) => {
         const is_key = autoincrement || primary_key;
 
         if (is_datetime && !no_default) continue;
-
         if (is_key) {
             key = fields[i].name;
             key_checker = `${fields[i].name}: joi${is_number ? '.number()' : '.string()'}.required(),`
@@ -248,13 +247,13 @@ const updateByKey = (table, fields) => {
         const {${field_vars}} = fields;
     `
 
-    let optional_checker = `let fields = \`\`\n`
+    let optional_checker = `let fields_val = \`\`\n`
     for (let i = 0; i < fields_arr.length; i++) {
         optional_checker += `if (${fields_arr[i]} != null) fields += \`SET ${fields_arr[i]} = '\${${fields_arr[i]}}', \`\n`
     }
     optional_checker += `
-    fields.trimEnd();
-    fields = fields.slice(0, fields.length-1);
+    fields_val.trimEnd();
+    fields_val = fields.slice(0, fields_val.length-1);
     `
 
     return `
@@ -262,7 +261,7 @@ const updateByKey = (table, fields) => {
         try {
             ${input_checker}
             ${optional_checker}
-            const query = \`UPDATE ${table} \${fields} WHERE ${key}='\${${key}}' \`;
+            const query = \`UPDATE ${table} \${fields_val} WHERE ${key}='\${${key}}' \`;
             const [resp] = await dbPool.query(query);
             return response(res, 200, '[Success]', resp);
         } catch (error) {
@@ -375,6 +374,9 @@ const routes = (table, exported) => {
 const generate = (table, fields) => {
     try {
         if (table == null || fields == null) return false;
+
+        const generate_path = path.join(__dirname, '../generated/');
+        if (!fs.existsSync(generate_path)) { fs.mkdirSync(generate_path); }
 
         // GENERATE DB CONN
         const db_conn_path = path.join(__dirname, '../generated/config/');

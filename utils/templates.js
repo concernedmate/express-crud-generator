@@ -175,7 +175,7 @@ const read = (table) => {
             const { error } = schema.validate(req.query);
             if (error) return response(res, 500, error.message);
 
-            const {from_row, limit} = req.query;
+            let {from_row, limit} = req.query;
 
             if (from_row == null) {  from_row = 0;  }
             if (limit == null) { limit = 100; }
@@ -185,7 +185,7 @@ const read = (table) => {
     const get${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
-            const query = 'SELECT * FROM ${table} LIMIT' + from_row + ', ' + limit;
+            const query = 'SELECT * FROM ${table} LIMIT ' + from_row + ', ' + limit;
             const [resp, fields] = await dbPool.query(query);
             return response(res, 200, '[Success]', prepareResponse(resp, fields));
         } catch (error) {

@@ -125,7 +125,7 @@ const create = (table, fields) => {
         ${field_checker}
         });
         const { error } = schema.validate(req.body);
-        if (error) return response(res, 500, error.message);
+        if (error) return response(res, 400, error.message);
 
         const {${field_vars}} = req.body;
     `
@@ -173,7 +173,7 @@ const read = (table) => {
                 limit: joi.number().optional()
             });
             const { error } = schema.validate(req.query);
-            if (error) return response(res, 500, error.message);
+            if (error) return response(res, 400, error.message);
 
             let {from_row, limit} = req.query;
 
@@ -238,10 +238,12 @@ const updateByKey = (table, fields) => {
 
     const input_checker = `const schema = joi.object({
             ${key_checker}
-            ${field_checker}
+            fields: joi.object({
+                ${field_checker}
+            }).required()
         });
         const { error } = schema.validate(req.body);
-        if (error) return response(res, 500, error.message);
+        if (error) return response(res, 400, error.message);
 
         const {${key}, fields} = req.body;
         const {${field_vars}} = fields;
@@ -249,11 +251,13 @@ const updateByKey = (table, fields) => {
 
     let optional_checker = `let fields_val = \`\`\n`
     for (let i = 0; i < fields_arr.length; i++) {
-        optional_checker += `if (${fields_arr[i]} != null) fields += \`SET ${fields_arr[i]} = '\${${fields_arr[i]}}', \`\n`
+        optional_checker += `if (${fields_arr[i]} != null) fields_val += \`${fields_arr[i]} = '\${${fields_arr[i]}}', \`\n`
     }
     optional_checker += `
-    fields_val.trimEnd();
-    fields_val = fields.slice(0, fields_val.length-1);
+    if (fields_val == \`\`) return response(res, 400, \`[Bad Request] Fields is empty!\`);
+
+    fields_val = fields_val.trimEnd();
+    fields_val = fields_val.slice(0, fields_val.length-1);
     `
 
     return `
@@ -261,7 +265,7 @@ const updateByKey = (table, fields) => {
         try {
             ${input_checker}
             ${optional_checker}
-            const query = \`UPDATE ${table} \${fields_val} WHERE ${key}='\${${key}}' \`;
+            const query = \`UPDATE ${table} SET \${fields_val} WHERE ${key}='\${${key}}' \`;
             const [resp] = await dbPool.query(query);
             return response(res, 200, '[Success]', resp);
         } catch (error) {
@@ -303,7 +307,7 @@ const deleteByKey = (table, fields) => {
             ${key_checker}
         });
         const { error } = schema.validate(req.body);
-        if (error) return response(res, 500, error.message);
+        if (error) return response(res, 400, error.message);
 
         const {${key}} = req.body;
     `
@@ -312,7 +316,7 @@ const deleteByKey = (table, fields) => {
     const delete${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
-            const query = \`DELETE ${table} WHERE ${key}='\${${key}}' \`;
+            const query = \`DELETE FROM ${table} WHERE ${key}='\${${key}}' \`;
             const [resp] = await dbPool.query(query);
             return response(res, 200, '[Success]', resp);
         } catch (error) {
@@ -343,7 +347,7 @@ const formatCamelCase = (str) => {
  * @returns {String}
  */
 const routes = (table, exported) => {
-    let requires = `const ${table}Controller = require('../controllers/${table}.js');\n`
+    let requires = `const ${formatCamelCase(table)}Controller = require('../controllers/${formatCamelCase(table)}.js');\n`
     let routes = ``;
     for (let i = 0; i < exported.length; i++) {
         let method = 'get';
@@ -358,7 +362,7 @@ const routes = (table, exported) => {
             method = 'delete';
             params = '/delete'
         }
-        routes += `router.${method}('${params}', ${table}Controller.${exported[i]});\n`;
+        routes += `router.${method}('${params}', ${formatCamelCase(table)}Controller.${exported[i]});\n`;
     }
     return `${requires}\n${routes}\nmodule.exports = router;`
 }

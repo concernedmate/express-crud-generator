@@ -342,8 +342,8 @@ const formatCamelCase = (str) => {
 
 /**
  * 
- * @param {String} table 
- * @param {String[]} exported 
+ * @param {String} table - controller file name
+ * @param {String[]} exported  - string with method/func names
  * @returns {String}
  */
 const routes = (table, exported) => {

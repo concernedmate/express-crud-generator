@@ -139,7 +139,7 @@ const create = (table, fields) => {
     `;
     for (let i = 0; i < not_required_val.length; i++) {
         optional_checker += `if (${not_required_val[i]} != null) {
-            col += \`\${${not_required_val[i]}},\`;
+            col += \`${not_required_val[i]},\`;
             val += \`'\${${not_required_val[i]}}',\`
         }`
     }
@@ -185,7 +185,7 @@ const read = (table) => {
     const get${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
-            const query = 'SELECT * FROM ${table} LIMIT ' + from_row + ', ' + limit;
+            const query = \`SELECT * FROM ${table} LIMIT \${from_row}, \${limit}\`;
             const [resp, fields] = await dbPool.query(query);
             return response(res, 200, '[Success]', prepareResponse(resp, fields));
         } catch (error) {

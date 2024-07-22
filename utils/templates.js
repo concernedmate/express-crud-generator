@@ -347,7 +347,10 @@ const formatCamelCase = (str) => {
  * @returns {String}
  */
 const routes = (table, exported) => {
-    let requires = `const ${formatCamelCase(table)}Controller = require('../controllers/${table}.js');\n`
+    let requires = `const express = require('express');
+    const router = express.Router();
+    const ${formatCamelCase(table)}Controller = require('../controllers/${table}.js');`
+    
     let routes = ``;
     for (let i = 0; i < exported.length; i++) {
         let method = 'get';

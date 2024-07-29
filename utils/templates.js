@@ -54,15 +54,13 @@ const dbConn = `
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
-var config = {
+const dbPool = mysql.createPool({
     user: process.env.MYSQL_UID,
     password: process.env.MYSQL_PWD,
     host: process.env.MYSQL_SERVER,
     database: process.env.MYSQL_DB,
     port: process.env.MYSQL_PORT
-};
-
-const dbPool = mysql.createPool(config);
+});
 
 module.exports = { dbPool }
 `
@@ -131,7 +129,7 @@ const create = (table, fields) => {
     `
 
     let required_val_string = required_val.slice(0);
-    required_val_string.forEach((elm, idx) => { required_val_string[idx] = `'\${${elm}}'`; });
+    required_val_string.forEach((elm, idx) => { required_val_string[idx] = `:${elm}`; });
 
     let optional_checker = `
         let col = \`${required_val.toString()}${required_val.length == 0 ? '' : ','}\`
@@ -140,7 +138,7 @@ const create = (table, fields) => {
     for (let i = 0; i < not_required_val.length; i++) {
         optional_checker += `if (${not_required_val[i]} != null) {
             col += \`${not_required_val[i]},\`;
-            val += \`'\${${not_required_val[i]}}',\`
+            val += \`:${not_required_val[i]},\`
         }`
     }
     optional_checker += `
@@ -153,7 +151,7 @@ const create = (table, fields) => {
         try {
             ${input_checker} ${optional_checker}
             const query = \`INSERT INTO ${table} (\${col}) VALUES (\${val})\`;
-            const [resp] = await dbPool.query(query);
+            const [resp] = await dbPool.query(query, {${field_vars}});
             return response(res, 200, '[Success]', resp);
         } catch (error) {
             return response(res, 500, error.message);
@@ -173,7 +171,7 @@ const read = (table) => {
                 limit: joi.number().optional()
             });
             const { error } = schema.validate(req.query);
-            if (error) return response(res, 400, error.message);
+            if (error) { return response(res, 400, error.message); }
 
             let {from_row, limit} = req.query;
 
@@ -185,8 +183,8 @@ const read = (table) => {
     const get${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
-            const query = \`SELECT * FROM ${table} LIMIT \${from_row}, \${limit}\`;
-            const [resp, fields] = await dbPool.query(query);
+            const query = \`SELECT * FROM ${table} LIMIT :from_row, :limit\`;
+            const [resp, fields] = await dbPool.query(query, {from_row, limit});
             return response(res, 200, '[Success]', prepareResponse(resp, fields));
         } catch (error) {
             return response(res, 500, error.message);
@@ -251,7 +249,7 @@ const updateByKey = (table, fields) => {
 
     let optional_checker = `let fields_val = \`\`\n`
     for (let i = 0; i < fields_arr.length; i++) {
-        optional_checker += `if (${fields_arr[i]} != null) fields_val += \`${fields_arr[i]} = '\${${fields_arr[i]}}', \`\n`
+        optional_checker += `if (${fields_arr[i]} != null) fields_val += \`${fields_arr[i]} = :${fields_arr[i]}, \`\n`
     }
     optional_checker += `
     if (fields_val == \`\`) return response(res, 400, \`[Bad Request] Fields is empty!\`);
@@ -265,8 +263,8 @@ const updateByKey = (table, fields) => {
         try {
             ${input_checker}
             ${optional_checker}
-            const query = \`UPDATE ${table} SET \${fields_val} WHERE ${key}='\${${key}}' \`;
-            const [resp] = await dbPool.query(query);
+            const query = \`UPDATE ${table} SET \${fields_val} WHERE ${key}=:${key} \`;
+            const [resp] = await dbPool.query(query, {${key}, ${fields_arr}});
             return response(res, 200, '[Success]', resp);
         } catch (error) {
             return response(res, 500, error.message);
@@ -316,8 +314,8 @@ const deleteByKey = (table, fields) => {
     const delete${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
-            const query = \`DELETE FROM ${table} WHERE ${key}='\${${key}}' \`;
-            const [resp] = await dbPool.query(query);
+            const query = \`DELETE FROM ${table} WHERE ${key}=:${key} \`;
+            const [resp] = await dbPool.query(query, {${key}});
             return response(res, 200, '[Success]', resp);
         } catch (error) {
             return response(res, 500, error.message);

@@ -11,3 +11,8 @@ options:
     -mysql
     -mssql
     -withmiddleware
+
+package used on the template:
+- joi
+- mysql2
+- express

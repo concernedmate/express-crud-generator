@@ -59,7 +59,8 @@ const dbPool = mysql.createPool({
     password: process.env.MYSQL_PWD,
     host: process.env.MYSQL_SERVER,
     database: process.env.MYSQL_DB,
-    port: process.env.MYSQL_PORT
+    port: process.env.MYSQL_PORT,
+    namedPlaceholders: true
 });
 
 module.exports = { dbPool }
@@ -75,7 +76,6 @@ const requiredImports = () => {
     const { response } = require('../utility/response');
     const { dbPool } = require("../config/initmysql");
     const joi = require('joi');
-    const { prepareResponse } = require("../utility/prepare");
     `
 }
 
@@ -123,7 +123,7 @@ const create = (table, fields) => {
         ${field_checker}
         });
         const { error } = schema.validate(req.body);
-        if (error) return response(res, 400, error.message);
+        if (error) { return response(res, 400, error.message); }
 
         const {${field_vars}} = req.body;
     `
@@ -167,25 +167,24 @@ const create = (table, fields) => {
  */
 const read = (table) => {
     const input_checker = `const schema = joi.object({
-                from_row: joi.number().optional(),
-                limit: joi.number().optional()
+                from_row: joi.number().required(),
+                limit: joi.number().required()
             });
             const { error } = schema.validate(req.query);
             if (error) { return response(res, 400, error.message); }
 
-            let {from_row, limit} = req.query;
-
-            if (from_row == null) {  from_row = 0;  }
-            if (limit == null) { limit = 100; }
+            const {from_row, limit} = req.query;
     `
 
     return `
     const get${formatCamelCase(table)} = async (req, res) => {
         try {
             ${input_checker}
-            const query = \`SELECT * FROM ${table} LIMIT :from_row, :limit\`;
-            const [resp, fields] = await dbPool.query(query, {from_row, limit});
-            return response(res, 200, '[Success]', prepareResponse(resp, fields));
+            const [resp, fields] = await dbPool.query(
+                \`SELECT * FROM ${table} LIMIT :from_row, :limit\`, 
+                {from_row, limit}
+            );
+            return response(res, 200, '[Success]', resp);
         } catch (error) {
             return response(res, 500, error.message);
         }
@@ -241,7 +240,7 @@ const updateByKey = (table, fields) => {
             }).required()
         });
         const { error } = schema.validate(req.body);
-        if (error) return response(res, 400, error.message);
+        if (error) { return response(res, 400, error.message); }
 
         const {${key}, fields} = req.body;
         const {${field_vars}} = fields;
@@ -305,7 +304,7 @@ const deleteByKey = (table, fields) => {
             ${key_checker}
         });
         const { error } = schema.validate(req.body);
-        if (error) return response(res, 400, error.message);
+        if (error) { return response(res, 400, error.message); }
 
         const {${key}} = req.body;
     `
@@ -347,7 +346,8 @@ const formatCamelCase = (str) => {
 const routes = (table, exported) => {
     let requires = `const express = require('express');
     const router = express.Router();
-    const ${formatCamelCase(table)}Controller = require('../controllers/${table}.js');`
+    const ${formatCamelCase(table)}Controller = require('../controllers/${table}.js');
+    `
     
     let routes = ``;
     for (let i = 0; i < exported.length; i++) {
